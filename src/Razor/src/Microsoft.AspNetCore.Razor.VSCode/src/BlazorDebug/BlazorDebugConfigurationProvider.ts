@@ -3,6 +3,7 @@
  * Licensed under the MIT License. See License.txt in the project root for license information.
  * ------------------------------------------------------------------------------------------ */
 
+import * as net from 'net';
 import * as vscode from 'vscode';
 
 import { RazorLogger } from '../RazorLogger';
@@ -23,9 +24,16 @@ export class BlazorDebugConfigurationProvider implements vscode.DebugConfigurati
             await this.launchApp(folder, configuration);
         }
 
-        this.vscodeType.debug.onDidStartDebugSession(async event => {
-            if (event.name === SERVER_APP_NAME) {
-                await this.launchBrowser(folder, configuration, event);
+        const debuggingPort = await this.getAvailablePort(9222);
+        const url = await vscode.commands.executeCommand<string>('ms-blazorwasm-companion.launchDebugProxy', '5.0.0', `http://localhost:${debuggingPort}`);
+        if (url) {
+            await this.launchBrowser(folder, configuration, url.replace('http', 'ws').replace('127.0.0.1', 'localhost'), debuggingPort);
+        }
+
+        const terminateDebugProxy = this.vscodeType.debug.onDidTerminateDebugSession(async event => {
+            if (event.name === JS_DEBUG_NAME || event.name === SERVER_APP_NAME) {
+                await vscode.commands.executeCommand('ms-blazorwasm-companion.killDebugProxy', url);
+                terminateDebugProxy.dispose();
             }
         });
 
@@ -78,7 +86,8 @@ export class BlazorDebugConfigurationProvider implements vscode.DebugConfigurati
         }
     }
 
-    private async launchBrowser(folder: vscode.WorkspaceFolder | undefined, configuration: vscode.DebugConfiguration, parentSession?: vscode.DebugSession) {
+    private async launchBrowser(folder: vscode.WorkspaceFolder | undefined, configuration: vscode.DebugConfiguration, wsAddress?: string, debuggingPort?: number, localPath?: string) {
+        const inspectUri = `${wsAddress}{browserInspectUriPath}`;
         const browser = {
             name: JS_DEBUG_NAME,
             type: configuration.browser === 'edge' ? 'pwa-msedge' : 'pwa-chrome',
@@ -86,10 +95,12 @@ export class BlazorDebugConfigurationProvider implements vscode.DebugConfigurati
             timeout: configuration.timeout || 30000,
             url: configuration.url || 'https://localhost:5001',
             webRoot: configuration.webRoot || '${workspaceFolder}',
-            inspectUri: '{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}',
+            inspectUri,
             trace: configuration.trace || false,
             noDebug: configuration.noDebug || false,
-            ...configuration.browserConfig,
+            port: debuggingPort,
+            runtimeArgs: [`--remote-debugging-port=${debuggingPort}`],
+            ...configuration.browserConfig
         };
 
         try {
@@ -102,7 +113,7 @@ export class BlazorDebugConfigurationProvider implements vscode.DebugConfigurati
              * We do this to provide immediate visual feedback to the user
              * that their debugger session has started.
              */
-            await this.vscodeType.debug.startDebugging(folder, browser, parentSession);
+            await this.vscodeType.debug.startDebugging(folder, browser);
         } catch (error) {
             this.logger.logError(
                 '[DEBUGGER] Error when launching browser debugger: ',
@@ -117,4 +128,38 @@ export class BlazorDebugConfigurationProvider implements vscode.DebugConfigurati
             });
         }
     }
+
+    private getAvailablePort(initialPort: number) {
+        function getNextAvailablePort(currentPort: number, cb: (port: number) => void) {
+            const server = net.createServer();
+            server.listen(currentPort, () => {
+                server.once('close', () => {
+                    cb(currentPort);
+                });
+                server.close();
+            });
+            server.on('error', () => {
+                getNextAvailablePort(++currentPort, cb);
+            });
+        }
+
+        return new Promise<number>(resolve => {
+            getNextAvailablePort(initialPort, resolve);
+        });
+    }
+
+    // private setPathMappings(folder: vscode.WorkspaceFolder | undefined, launchConfig: any, localPath?: string) {
+    //     // remoteName is set when connected to a remote
+    //     if (typeof vscode.env.remoteName !== 'undefined') {
+    //         const remoteRoot = folder && folder.uri && folder.uri.fsPath;
+    //         // const hash = crypto.createHash('md5').update(remoteRoot).digest('hex');
+    //         launchConfig.webRoot = `${localPath}/testdirectory`;
+    //         launchConfig.sourceMapPathOverrides = {
+    //             [`${remoteRoot}*`]: `${localPath}*`,
+    //         };
+    //         // launchConfig.pathMappings = ""
+    //         // launchConfig.__remoteFilePrefix =
+    //     }
+    //     return launchConfig;
+    // }
 }
