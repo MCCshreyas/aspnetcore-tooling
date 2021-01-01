@@ -20,16 +20,18 @@
     },
     {
       "name": "Run Extension",
-      "type": "extensionHost",
+      "type": "pwa-extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
       "args": [
-        "${workspaceFolder}/src/Razor/test/testapps/",
+        "${workspaceFolder}/src/Razor/test/testapps/debuggingfoo",
         "--extensionDevelopmentPath=${workspaceFolder}/src/Razor/src/Microsoft.AspNetCore.Razor.VSCode.Extension",
+        "--extensionDevelopmentPath=${workspaceFolder}/src/Razor/src/Microsoft.AspNetCore.Razor.VSCode.BlazorWasmCompanionExtension",
         "--enable-proposed-api razor-vscode",
-        "--enable-proposed-api ms-dotnettools.csharp"
+        "--enable-proposed-api ms-dotnettools.csharp",
       ],
       "outFiles": [
+        "${workspaceFolder}/src/Razor/src/Microsoft.AspNetCore.Razor.VSCode.BlazorWasmCompanionExtension/dist/**/*.js",
         "${workspaceFolder}/src/Razor/src/Microsoft.AspNetCore.Razor.VSCode.Extension/dist/**/*.js",
         "${workspaceFolder}/src/Razor/src/Microsoft.AspNetCore.Razor.VSCode/dist/**/*.js",
       ],
