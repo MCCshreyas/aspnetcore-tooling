@@ -8,7 +8,11 @@
 	},
 	"categories": [
 		"Other"
-	],
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "publisher": "SafiaAbdalla",
 	"activationEvents": [
 		"onCommand:ms-blazorwasm-companion.launchDebugProxy"
 	],

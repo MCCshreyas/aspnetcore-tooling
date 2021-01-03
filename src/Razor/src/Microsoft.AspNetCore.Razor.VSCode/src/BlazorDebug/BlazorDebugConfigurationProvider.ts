@@ -100,7 +100,7 @@ export class BlazorDebugConfigurationProvider implements vscode.DebugConfigurati
             noDebug: configuration.noDebug || false,
             port: debuggingPort,
             runtimeArgs: [`--remote-debugging-port=${debuggingPort}`],
-            ...configuration.browserConfig
+            ...configuration.browserConfig,
         };
 
         try {

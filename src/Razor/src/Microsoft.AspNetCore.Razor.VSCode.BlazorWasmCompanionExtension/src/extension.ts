@@ -8,11 +8,17 @@ export function activate(context: vscode.ExtensionContext) {
 
     const launchDebugProxy = vscode.commands.registerCommand('ms-blazorwasm-companion.launchDebugProxy', async (version = "5.0.0", debuggingHost = 'http://localhost:9222') => {
         try {
+            outputChannel.appendLine(`Launching proxy version ${version} for ${debuggingHost}...`);
             const localDebugProxyManager = new LocalDebugProxyManager();
 
-            const debugProxyLocalPath = await localDebugProxyManager.getDebugProxyLocalNugetPath(version);
-            outputChannel.appendLine(`Launching debugging proxy from ${debugProxyLocalPath}/tools/BlazorDebugProxy/BrowserDebugHost.dll`);
-            const spawnedProxy = spawn('dotnet', ['exec', `${debugProxyLocalPath}/tools/BlazorDebugProxy/BrowserDebugHost.dll`, '--DevToolsUrl', debuggingHost]);
+            const debugProxyLocalDirectory = await localDebugProxyManager.getDebugProxyLocalNugetPath(version);
+            const debugProxyLocalPath = `${debugProxyLocalDirectory}/tools/BlazorDebugProxy/BrowserDebugHost.dll`;
+            outputChannel.appendLine(`Launching debugging proxy from ${debugProxyLocalPath}`);
+            const spawnedProxy = spawn('/usr/local/share/dotnet/dotnet',
+                [debugProxyLocalPath , '--DevToolsUrl', debuggingHost],
+                { detached: process.platform !== 'win32' });
+
+            spawnedProxy.stdout.on('data', (data) => outputChannel.appendLine(data.toString()));
 
             for await (const output of spawnedProxy.stdout) {
                 outputChannel.appendLine(output);
@@ -24,6 +30,10 @@ export function activate(context: vscode.ExtensionContext) {
                     pidsByUrl.set(url, spawnedProxy.pid);
                     return url;
                 }
+            }
+
+            for await (const error of spawnedProxy.stderr) {
+                outputChannel.appendLine(error);
             }
 
             return;
